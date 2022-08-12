@@ -1,3 +1,4 @@
+import 'package:latlong2/latlong.dart';
 import 'package:surf_practice_chat_flutter/features/chat/exceptions/invalid_message_exception.dart';
 import 'package:surf_practice_chat_flutter/features/chat/exceptions/user_not_found_exception.dart';
 import 'package:surf_practice_chat_flutter/features/chat/models/chat_geolocation_geolocation_dto.dart';
@@ -6,6 +7,8 @@ import 'package:surf_practice_chat_flutter/features/chat/models/chat_message_loc
 import 'package:surf_practice_chat_flutter/features/chat/models/chat_user_dto.dart';
 import 'package:surf_practice_chat_flutter/features/chat/models/chat_user_local_dto.dart';
 import 'package:surf_study_jam/surf_study_jam.dart';
+
+import '../../topics/models/chat_topic_dto.dart';
 
 /// Basic interface of chat features.
 ///
@@ -21,7 +24,7 @@ abstract class IChatRepository {
   /// the same name that you specified in [sendMessage].
   ///
   /// Throws an [Exception] when some error appears.
-  Future<Iterable<ChatMessageDto>> getMessages();
+  Future<Iterable<ChatMessageDto>> getMessages(int chatId);
 
   /// Sends the message by with [message] content.
   ///
@@ -31,7 +34,8 @@ abstract class IChatRepository {
   ///
   /// [message] mustn't be empty and longer than [maxMessageLength]. Throws an
   /// [InvalidMessageException].
-  Future<Iterable<ChatMessageDto>> sendMessage(String message);
+  Future<Iterable<ChatMessageDto>> sendMessage(
+      String message, int chatId, LatLng? position, List<String>? images);
 
   /// Sends the message by [location] contents. [message] is optional.
   ///
@@ -44,10 +48,6 @@ abstract class IChatRepository {
   ///
   /// If [message] is non-null, content mustn't be empty and longer than
   /// [maxMessageLength]. Throws an [InvalidMessageException].
-  Future<Iterable<ChatMessageDto>> sendGeolocationMessage({
-    required ChatGeolocationDto location,
-    String? message,
-  });
 
   /// Retrieves chat's user via his [userId].
   ///
@@ -56,6 +56,8 @@ abstract class IChatRepository {
   ///
   /// Throws an [Exception] when some error appears.
   Future<ChatUserDto> getUser(int userId);
+
+  Future<List<SjChatDto>> getChatById();
 }
 
 /// Simple implementation of [IChatRepository], using [StudyJamClient].
@@ -66,38 +68,28 @@ class ChatRepository implements IChatRepository {
   ChatRepository(this._studyJamClient);
 
   @override
-  Future<Iterable<ChatMessageDto>> getMessages() async {
-    final messages = await _fetchAllMessages();
+  Future<Iterable<ChatMessageDto>> getMessages(int chatId) async {
+    final messages = await _fetchAllMessages(chatId);
 
     return messages;
   }
 
   @override
-  Future<Iterable<ChatMessageDto>> sendMessage(String message) async {
+  Future<Iterable<ChatMessageDto>> sendMessage(
+    String message,
+    int chatId,
+    LatLng? position,
+    List<String>? images,
+  ) async {
     if (message.length > IChatRepository.maxMessageLength) {
       throw InvalidMessageException('Message "$message" is too large.');
     }
-    await _studyJamClient.sendMessage(SjMessageSendsDto(text: message));
+    List<double>? geoPoint =
+        position == null ? null : [position.latitude, position.longitude];
+    await _studyJamClient.sendMessage(
+        SjMessageSendsDto(text: message, images: images, geopoint: geoPoint, chatId: chatId));
 
-    final messages = await _fetchAllMessages();
-
-    return messages;
-  }
-
-  @override
-  Future<Iterable<ChatMessageDto>> sendGeolocationMessage({
-    required ChatGeolocationDto location,
-    String? message,
-  }) async {
-    if (message != null && message.length > IChatRepository.maxMessageLength) {
-      throw InvalidMessageException('Message "$message" is too large.');
-    }
-    await _studyJamClient.sendMessage(SjMessageSendsDto(
-      text: message,
-      geopoint: location.toGeopoint(),
-    ));
-
-    final messages = await _fetchAllMessages();
+    final messages = await _fetchAllMessages(chatId);
 
     return messages;
   }
@@ -114,18 +106,18 @@ class ChatRepository implements IChatRepository {
         : ChatUserDto.fromSJClient(user);
   }
 
-  Future<Iterable<ChatMessageDto>> _fetchAllMessages() async {
+  Future<Iterable<ChatMessageDto>> _fetchAllMessages(int lastMessageId) async {
     final messages = <SjMessageDto>[];
 
     var isLimitBroken = false;
-    var lastMessageId = 0;
 
     // Chat is loaded in a 10 000 messages batches. It takes several batches to
     // load chat completely, especially if there's a lot of messages. Due to
     // API-request limitations, we can't load everything at one request, so
     // we're doing it in cycle.
     while (!isLimitBroken) {
-      final batch = await _studyJamClient.getMessages(lastMessageId: lastMessageId, limit: 10000);
+      final batch = await _studyJamClient.getMessages(
+        chatId: lastMessageId, limit: 10000);
       messages.addAll(batch);
       lastMessageId = batch.last.chatId;
       if (batch.length < 10000) {
@@ -138,24 +130,39 @@ class ChatRepository implements IChatRepository {
     for (final message in messages) {
       messagesWithUsers[message.id] = message.userId;
     }
-    final users = await _studyJamClient.getUsers(messagesWithUsers.values.toSet().toList());
+    final users = await _studyJamClient
+        .getUsers(messagesWithUsers.values.toSet().toList());
     final localUser = await _studyJamClient.getUser();
 
-    return messages
-        .map(
-          (sjMessageDto) => sjMessageDto.geopoint == null
-              ? ChatMessageDto.fromSJClient(
-                  sjMessageDto: sjMessageDto,
-                  sjUserDto: users.firstWhere((userDto) => userDto.id == sjMessageDto.userId),
-                  isUserLocal:
-                      users.firstWhere((userDto) => userDto.id == sjMessageDto.userId).id ==
-                          localUser?.id,
-                )
-              : ChatMessageGeolocationDto.fromSJClient(
-                  sjMessageDto: sjMessageDto,
-                  sjUserDto: users.firstWhere((userDto) => userDto.id == sjMessageDto.userId),
-                ),
-        )
-        .toList();
+    return messages.map(
+      (sjMessageDto) {
+        return ChatMessageDto.fromSJClient(
+          images: sjMessageDto.images,
+          location: sjMessageDto.geopoint == null
+              ? null
+              : ChatGeolocationDto.fromGeoPoint(sjMessageDto.geopoint!),
+          sjMessageDto: sjMessageDto,
+          sjUserDto:
+              users.firstWhere((userDto) => userDto.id == sjMessageDto.userId),
+          isUserLocal: users
+                  .firstWhere((userDto) => userDto.id == sjMessageDto.userId)
+                  .id ==
+              localUser?.id,
+        );
+      },
+    ).toList();
+  }
+
+  @override
+  Future<List<SjChatDto>> getChatById() async {
+    final ids = await _studyJamClient.getUpdates(chats: DateTime(2020));
+    final chatsData = await _studyJamClient.getChatsByIds(ids.chats!.take(1000).toList());
+    print(chatsData[0].name);
+    print(chatsData[1].name);
+    print(chatsData[0].avatar);
+    print(chatsData[0].description);
+    print(chatsData[0].id);
+
+    return chatsData.toList();
   }
 }

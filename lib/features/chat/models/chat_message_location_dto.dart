@@ -6,6 +6,7 @@ import 'package:surf_study_jam/surf_study_jam.dart';
 /// Data transfer object representing geolocation chat message.
 class ChatMessageGeolocationDto extends ChatMessageDto {
   /// Location point.
+  @override
   final ChatGeolocationDto location;
 
   /// Constructor for [ChatMessageGeolocationDto].

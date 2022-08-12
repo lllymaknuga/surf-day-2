@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:surf_practice_chat_flutter/features/auth/models/token_dto.dart';
 import 'package:surf_practice_chat_flutter/features/auth/repository/auth_repository.dart';
-import 'package:surf_practice_chat_flutter/features/chat/repository/chat_repository.dart';
-import 'package:surf_practice_chat_flutter/features/chat/screens/chat_screen.dart';
-import 'package:surf_study_jam/surf_study_jam.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-/// Screen for authorization process.
-///
-/// Contains [IAuthRepository] to do so.
+import '../blocs/auth_bloc.dart';
+
 class AuthScreen extends StatefulWidget {
-  /// Repository for auth implementation.
   final IAuthRepository authRepository;
 
-  /// Constructor for [AuthScreen].
   const AuthScreen({
     required this.authRepository,
     Key? key,
@@ -23,23 +17,148 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  // TODO(task): Implement Auth screen.
   @override
   Widget build(BuildContext context) {
-    throw UnimplementedError();
+    return const SafeArea(
+      child: Scaffold(
+        backgroundColor: Color.fromRGBO(46, 46, 46, 1),
+        appBar: PreferredSize(
+          preferredSize: Size.fromHeight(48),
+          child: _AppBar(),
+        ),
+        body: _Screen(),
+      ),
+    );
+  }
+}
+
+class _Screen extends StatefulWidget {
+  const _Screen({Key? key}) : super(key: key);
+
+  @override
+  State<_Screen> createState() => _ScreenState();
+}
+
+class _ScreenState extends State<_Screen> {
+  final TextEditingController _controllerLogin = TextEditingController();
+  final TextEditingController _controllerPassword = TextEditingController();
+
+  @override
+  void initState() {
+    _controllerLogin.text = 'lllymaknuga';
+    _controllerPassword.text = 'SbXAySLHARlr';
+    super.initState();
   }
 
-  void _pushToChat(BuildContext context, TokenDto token) {
-    Navigator.push<ChatScreen>(
-      context,
-      MaterialPageRoute(
-        builder: (_) {
-          return ChatScreen(
-            chatRepository: ChatRepository(
-              StudyJamClient().getAuthorizedClient(token.token),
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Text(
+            'Авторизация',
+            style: TextStyle(
+              fontSize: 20,
+              color: Colors.white,
             ),
-          );
-        },
+          ),
+          const SizedBox(
+            height: 10,
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Логин',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontFamily: 'Comfortaa',
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(
+                height: 10,
+              ),
+              TextField(
+                style: const TextStyle(color: Colors.white),
+                controller: _controllerLogin,
+                decoration: const InputDecoration(
+                  filled: true,
+                  fillColor: Color.fromRGBO(33, 33, 33, 1),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide.none,
+                    borderRadius: BorderRadius.all(
+                      Radius.circular(10),
+                    ),
+                  ),
+                  hintText: 'Введите url',
+                  hintStyle: TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(
+                height: 10,
+              ),
+              const Text(
+                'Пароль',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontFamily: 'Comfortaa',
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(
+                height: 10,
+              ),
+              TextField(
+                style: const TextStyle(color: Colors.white),
+                controller: _controllerPassword,
+                decoration: const InputDecoration(
+                  filled: true,
+                  fillColor: Color.fromRGBO(33, 33, 33, 1),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide.none,
+                    borderRadius: BorderRadius.all(
+                      Radius.circular(10),
+                    ),
+                  ),
+                  hintText: 'Введите url',
+                  hintStyle: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          ElevatedButton(
+            onPressed: () {
+              context.read<AuthBloc>().add(LoginAuthEvent(
+                  login: _controllerLogin.text,
+                  password: _controllerPassword.text));
+            },
+            child: const Text('Войти'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppBar extends StatelessWidget {
+  const _AppBar({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      backgroundColor: const Color.fromRGBO(33, 33, 33, 1),
+      title: Row(
+        children: const [
+          Expanded(
+            child: Text('Surf summer jum'),
+          ),
+        ],
       ),
     );
   }

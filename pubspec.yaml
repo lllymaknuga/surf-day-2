@@ -11,8 +11,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  surf_study_jam: ^0.2.0
-
+  surf_study_jam: ^0.2.0+1
+  flutter_bloc: ^8.0.1
+  equatable: ^2.0.3
+  flutter_secure_storage: ^5.1.0
+  geolocator: ^9.0.1
+  flutter_map: ^2.2.0
+  latlong2: ^0.8.1
   cupertino_icons: ^1.0.2
 
 dev_dependencies:
@@ -23,3 +28,14 @@ dev_dependencies:
 flutter:
 
   uses-material-design: true
+
+  assets:
+    - assets/images/
+
+  fonts:
+    - family: Comfortaa
+      fonts:
+        - asset: assets/fonts/Comfortaa-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Comfortaa-Regular.ttf
+          weight: 400
